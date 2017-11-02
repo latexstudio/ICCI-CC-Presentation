@@ -1,0 +1,906 @@
+\ProvidesPackage{beamerouterthemeprogressbarjma}[2010/09/14]
+
+% Based upon Beamer theme by Sylvain Bouveret <sylvain[dot]bouveret[aT]cert[DoT]fr>
+% jun. 2007 version 0.32
+% 
+% Modified by J. McKenzie Alexander <jalex[at]lse.ac.uk>
+% sept. 2010 version 0.32a
+%
+% based on the LaTeX-Beamer package :
+% Copyright 2003 by Till Tantau <tantau@users.sourceforge.net>
+%
+% This program can be blueistributed and/or modified under the terms
+% of the GNU Public License, version 2.
+
+\RequirePackage{tikz}
+
+\makeatletter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Some color definitions...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \setbeamercolor{progressbar primary}{parent=palette primary}
+\setbeamercolor{progressbar secondary}{parent=palette secondary}
+\setbeamercolor{progressbar tertiary}{parent=palette tertiary}
+\setbeamercolor{progressbar quaternary}{parent=palette quaternary}
+
+\setbeamercolor{progressbar primary}{fg=black}
+\setbeamercolor{section in head/foot}{parent=palette tertiary}
+\setbeamercolor{subsection in head/foot}{parent=palette secondary}
+\setbeamercolor{author in head/foot}{parent=subsection in head/foot}
+\setbeamercolor{title in head/foot}{parent=section in head/foot}
+
+\colorlet{progressbarleft}{black!10!white}
+\colorlet{progressbarright}{black!20!white}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Some computations dedicated to the progressbar...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newdimen\progressbar@currentbarlength
+\newdimen\progressbar@framenumberrectangle
+\newdimen\progressbar@titlerectangle
+\newdimen\progressbar@leftbar
+\newdimen\progressbar@chunk
+\newlength\progressbar@tmplngth
+
+\newcount\progressbar@tmpresult
+\newcount\progressbar@barlength
+\newcount\progressbar@currentframe
+\newcount\progressbar@totalframes
+\newcount\progressbar@currentslide
+\newcount\progressbar@ctmp@i
+\newcount\progressbar@ctmp@ii
+
+\newtoks\progressbar@toks
+
+\progressbar@framenumberrectangle=\paperwidth
+% The following adjustment is needed because otherwise the box
+% containing the current / total frame numbers touches the right
+% margin when there are 2 digits in both the current and total frame
+% numbers.
+\addtolength{\progressbar@framenumberrectangle}{-2pt}
+\progressbar@titlerectangle=\paperwidth
+
+\advance\progressbar@framenumberrectangle by -1cm
+\advance\progressbar@titlerectangle by -1.2cm
+
+\progressbar@barlength=115 % (in millimeters)
+\progressbar@leftbar=\progressbar@titlerectangle
+\advance\progressbar@leftbar by -\progressbar@barlength mm
+
+\newif\iftitleswatch
+  \titleswatchfalse
+\newif\if@pb@linktoendofframe
+  \@pb@linktoendofframetrue
+\newif\ifpips
+  \pipsfalse
+\newif\ifprogressbarsection
+  \progressbarsectiontrue
+\newif\ifprogressbaradvanceeveryslide
+  \progressbaradvanceeveryslidefalse
+\newif\iflinks
+  \linkstrue
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Declare, Execute and Process the theme options...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% \ifprogressbaradvanceeveryslide
+% \let\insertprogressbar=\insertprogressbarslides
+% \else
+% \let\insertprogressbar=\insertprogressbarframes
+% \fi
+
+\let\pb@oldappendix=\appendix
+
+\renewcommand{\appendix}
+{
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  % This piece of code is supposed to introduce a bias in the
+  % number of slides
+  \immediate\write\@mainaux{%
+    \noexpand\gdef\noexpand\insertintermediateframenumber{%
+      \the\c@framenumber}}
+  \global\let\section=\@pboldbeamersection
+  % \immediate\write\@auxout{%
+  %   \string\@writefile{nav}%
+  %   {\noexpand\headcommand{\noexpand\def\noexpand\insertintermediateframenumber{\the\c@framenumber}}}}
+
+  %\renewcommand{\insertintermediateframenumber}{\inserttotalframenumber}
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% 
+  \setbeamertemplate{footline}[default]%
+  \pb@oldappendix
+}
+\def\insertintermediateframenumber{\inserttotalframenumber}
+
+\def\appendixtitle#1{
+\begin{frame}[plain]
+    \vfill
+    \begin{center}
+      \pgfuseshading{separationtitlepagelineshading}
+      \vskip.75\baselineskip
+      \textbf{\color{blue!55!black}\large #1}
+      \pgfuseshading{separationtitlepagelineshading}
+    \end{center}
+    \vfill
+  \end{frame}}
+
+\def\progressbar@adjustframetotals{0}
+\def\insertprogressbar{\insertprogressbarslides}
+
+% Set up some natural defaults based on the mode
+\mode<trans>{
+  \def\insertprogressbar{\insertprogressbarframes}%
+  \progressbaradvanceeveryslidefalse
+}
+\mode<beamer>{
+  \def\insertprogressbar{\insertprogressbarslides}%
+  \progressbaradvanceeveryslidetrue
+}
+
+\DeclareOptionBeamer{links}[true]{\csname links#1\endcsname}
+\DeclareOptionBeamer{pips}[true]{\csname pips#1\endcsname} 
+\DeclareOptionBeamer{titleswatch}[true]{\csname titleswatch#1\endcsname} 
+\DeclareOptionBeamer{adjustframecount}[0]{%
+  \gdef\progressbar@adjustframetotals{#1}}
+\DeclareOptionBeamer{linktoendofframe}{\csname
+  @pb@linktoendofframe#1\endcsname}
+\DeclareOptionBeamer{sections}{\csname
+  progressbarsection#1\endcsname}
+\DeclareOptionBeamer{draft}{\def\insertprogressbar{\insertprogressbardraft}}
+\DeclareOptionBeamer{slides}{%
+  \def\insertprogressbar{\insertprogressbarslides}%
+  \progressbaradvanceeveryslidetrue}
+\DeclareOptionBeamer{frames}{%
+  \def\insertprogressbar{\insertprogressbarframes}%
+  \progressbaradvanceeveryslidefalse}
+\ProcessOptionsBeamer
+
+\def\progressbar@page#1{%
+  \gdef\progressbar@totalslides{#1}}
+
+% Definition is of the form: \progressbar@section{page}{frame}.
+\def\progressbar@section#1#2{%
+  \ifprogressbaradvanceeveryslide
+    \global\progressbar@toks={\progressbar@sectionmark{#1}}%
+    \gdef\progressbar@section##1##2{%
+      \global\progressbar@toks=\expandafter{\the\progressbar@toks
+      \progressbar@sectionmark{##1}}}%
+  \else
+    \global\progressbar@toks={\progressbar@sectionmark{#2}}%
+    \gdef\progressbar@section##1##2{%
+      \global\progressbar@toks=\expandafter{\the\progressbar@toks
+      \progressbar@sectionmark{##2}}}%
+  \fi}
+
+\def\progressbar@subsection#1#2{%
+  \ifprogressbaradvanceeveryslide
+    %\global\progressbar@toks={\progressbar@subsectionmark{#1}}%
+    \global\progressbar@toks=\expandafter{\the\progressbar@toks
+      \progressbar@subsectionmark{#1}} 
+    \gdef\progressbar@subsection##1##2{%
+      \global\progressbar@toks=\expandafter{\the\progressbar@toks
+      \progressbar@subsectionmark{##1}}}%
+  \else
+    %\global\progressbar@toks={\progressbar@subsectionmark{#2}}%
+    \global\progressbar@toks=\expandafter{\the\progressbar@toks
+      \progressbar@subsectionmark{#2}}
+    \gdef\progressbar@subsection##1##2{%
+      \global\progressbar@toks=\expandafter{\the\progressbar@toks
+      \progressbar@subsectionmark{##2}}}%
+  \fi}
+
+\def\progressbar@sectionmark#1{%
+  {\progressbar@ctmp@i=#1
+    \ifprogressbaradvanceeveryslide
+    \advance\progressbar@ctmp@i by -1
+    \fi
+    \draw[fg!40!bg]
+    ([xshift=\progressbar@leftbar] \progressbar@ctmp@i\progressbar@chunk, 0.11cm) 
+    --
+    ([xshift=\progressbar@leftbar] \progressbar@ctmp@i\progressbar@chunk, 0.31cm);}}
+
+\def\progressbar@subsectionmark#1{%
+  {\progressbar@ctmp@i=#1
+    \ifprogressbaradvanceeveryslide
+    \advance\progressbar@ctmp@i by -1
+    \fi
+    \draw[fg!40!bg]
+    ([xshift=\progressbar@leftbar] \progressbar@ctmp@i\progressbar@chunk, 0.11cm) 
+    --
+    ([xshift=\progressbar@leftbar] \progressbar@ctmp@i\progressbar@chunk, 0.19cm);}}
+
+\def\progressbarsectionbreak{%
+  \immediate\write\@mainaux{\noexpand\progressbar@section{\the\c@page}{\insertframenumber}}}
+
+\def\progressbarsubsectionbreak{%
+  \immediate\write\@mainaux{\noexpand\progressbar@subsection{\the\c@page}{\insertframenumber}}}
+
+\let\@pboldbeamersection=\section
+\def\section{\progressbarsectionbreak\@pboldbeamersection}
+
+\let\@pboldbeamersubsection=\subsection
+\def\subsection{\progressbarsubsectionbreak\@pboldbeamersubsection}
+
+\def\progressbarstartreferences{%
+  {\progressbar@ctmp@i=\c@page
+    \advance\progressbar@ctmp@i by -1
+    \progressbar@ctmp@ii=\insertframenumber
+    \advance\progressbar@ctmp@ii by -1
+    \immediate\write\@mainaux{%
+      \noexpand\progressbar@section{%
+        \the\progressbar@ctmp@i}{\the\progressbar@ctmp@ii}}}%
+  \global\let\section=\@pboldbeamersection}
+
+% syntax is \progressbar@xref{frame-number}{page-number}
+\if@pb@linktoendofframe
+% Because \progressbar@xref{frame}{page} is written to the auxiliary
+% file each time a page is generated, we can link to the last build of
+% a frame by simply defining \progressbar@frameref@N to be the page
+% number. The last definition which survives will be the final page of
+% the build.
+\def\progressbar@xref#1#2{\expandafter\gdef\csname progressbar@frameref@#1\endcsname{#2}}
+\else
+% Linking to the first frame of a build is achieved by checking to see
+% whether \progressbar@frameref@N is defined. If undefined, define it
+% to be the page number --- this is the first build of the frame. If
+% defined, do nothing.
+\def\progressbar@xref#1#2{%
+  \@ifundefined{progressbar@frameref@#1}{%
+    \expandafter\gdef\csname progressbar@frameref@#1\endcsname{#2}}{}}
+\fi
+
+\def\createprogressbarxref{%
+  \immediate\write\@mainaux{%
+    \noexpand\progressbar@xref{\insertframenumber}{\the\c@page}}}
+
+\def\insertprogressbardraft{
+  % Write a macro to the auxiliary file to determine how many
+  % slides exist.
+  \immediate\write\@mainaux{\noexpand\progressbar@page{\the\c@page}}
+
+  % Set up some counters needed
+  \ifnum\insertframenumber=1\else
+
+    \progressbar@currentframe=\insertframenumber
+    \advance\progressbar@currentframe by -1
+    \progressbar@totalframes=\insertintermediateframenumber%\inserttotalframenumber
+    \advance\progressbar@totalframes by -1
+    \progressbar@currentslide=\c@page
+    \advance\progressbar@currentslide by -1
+
+    \@ifundefined{progressbar@xref@\insertframenumber}{%
+      \immediate\write\@mainaux{%
+        \noexpand\progressbar@xref{\insertframenumber}{\the\c@page}}}{}
+
+    \begin{tikzpicture}
+      \shade[top color=bg, bottom color=bg!80!fg] 
+          (0, 0) rectangle  (\paperwidth, 0.525cm);
+      \shade[left color=bg,right color=bg!70!fg] 
+          (.5\paperwidth, 0.2cm) rectangle (\paperwidth, 0.22cm);
+      
+      % Draw the N/M numbers on the right
+      {
+        \draw (\progressbar@framenumberrectangle, 0.21cm) 
+        node [anchor=mid west, draw=bg!70!fg, fill=bg] 
+        {
+          \color{structure.fg!70!bg}%
+          \the\progressbar@currentframe~/~\the\progressbar@totalframes
+        };
+      }
+
+      \fill[fill=bg, rounded corners=0.1cm] 
+        (\progressbar@leftbar, 0.12cm) 
+        rectangle 
+        (\progressbar@titlerectangle, 0.3cm);
+
+     \draw (\progressbar@leftbar, 0.11cm) 
+       [
+         draw=fg!30!bg,
+         inner sep=0pt,
+         outer sep=0pt,
+         rounded corners=0.1cm
+       ] 
+       rectangle ++(\progressbar@barlength*0.1cm, 0.2cm); 
+    
+    \end{tikzpicture}
+  \fi
+}
+
+
+\def\insertprogressbarslides{
+  % Write a macro to the auxiliary file to determine how many
+  % slides exist.
+  \immediate\write\@mainaux{\noexpand\progressbar@page{\the\c@page}}
+
+  % Set up some counters needed
+  \ifnum\insertframenumber=1\else
+    \progressbar@currentframe=\insertframenumber
+    \advance\progressbar@currentframe by -1
+    \progressbar@totalframes=\insertintermediateframenumber%\inserttotalframenumber
+    \advance\progressbar@totalframes by -1
+    \advance\progressbar@totalframes by \progressbar@adjustframetotals
+    \progressbar@currentslide=\c@page
+    \advance\progressbar@currentslide by -1
+
+    \@ifundefined{progressbar@xref@\insertframenumber}{%
+      \immediate\write\@mainaux{%
+        \noexpand\progressbar@xref{\insertframenumber}{\the\c@page}}}{}
+
+    \@ifundefined{progressbar@totalslides}{%
+      % This happens if we are doing a first run and the .aux file
+      % doesn't have all of the data saved that we need. At this
+      % point, it's best to switch to drawing the progressbar in draft
+      % mode.
+      \global\let\insertprogressbar=\insertprogressbardraft
+      \insertprogressbardraft
+    }{%
+      \finishprogressbarslides
+    }
+
+  \fi
+}
+
+\def\finishprogressbarslides{
+  % First, calculate the right chunk size to use
+  \pgfmathsetlength{\progressbar@chunk}{%
+    (1/(\progressbar@totalslides-1)*(\progressbar@barlength))*.1cm
+  }
+
+  \begin{tikzpicture}
+    \shade[top color=bg, bottom color=bg!80!fg] 
+        (0, 0) rectangle  (\paperwidth, 0.525cm);
+    \shade[left color=bg,right color=bg!70!fg] 
+        (.5\paperwidth, 0.2cm) rectangle (\paperwidth, 0.22cm);
+      
+    % Draw the N/M numbers on the right
+    {
+      \draw (\progressbar@framenumberrectangle, 0.21cm) 
+        node [anchor=mid west, draw=bg!70!fg, fill=bg] 
+        {
+          \color{structure.fg!70!bg}%
+          \the\progressbar@currentframe~/~\the\progressbar@totalframes
+        };
+    }
+
+    \fill[fill=bg, rounded corners=0.1cm] 
+      (\progressbar@leftbar, 0.12cm) 
+      rectangle 
+      (\progressbar@titlerectangle, 0.3cm);
+      
+    \ifnum\insertframenumber=1\else {
+      % This draws the main progress bar...
+      % We test to see whether we are drawing a completely filled
+      % progress bar because sometimes roundoff error
+      % occurs --- which means that the progress bar might not seem to
+      % perfectly fill the space allotted. When the progress bar is
+      % only partially filled, this doesn't matter, but at the end
+      % when the progress bar is suppose to be "completely full" it
+      % looks bad.
+      \progressbar@ctmp@i=\progressbar@totalslides
+      \advance\progressbar@ctmp@i by -1\relax
+      \ifnum\progressbar@currentslide=\progressbar@ctmp@i
+      \shade[left color=progressbarleft,
+          right color=progressbarright, 
+          rounded corners=0.1cm] 
+          (\progressbar@leftbar, 0.11cm) rectangle ++
+          (\progressbar@barlength*0.1cm, 0.2cm);
+      % \shade[left color=progressbar primary.fg!10!bg,
+      %     right color=progressbar primary.fg!20!bg, 
+      %     rounded corners=0.1cm] 
+      %     (\progressbar@leftbar, 0.11cm) rectangle ++
+      %     (\progressbar@barlength mm, 0.2cm);
+      \else
+      \shade[left color=progressbarleft,
+          right color=progressbarright, 
+          rounded corners=0.1cm] 
+          (\progressbar@leftbar, 0.11cm) rectangle ++
+          (\progressbar@currentslide\progressbar@chunk, 0.2cm);
+      % \shade[left color=progressbar primary.fg!10!bg,
+      %     right color=progressbar primary.fg!20!bg, 
+      %     rounded corners=0.1cm] 
+      %     (\progressbar@leftbar, 0.11cm) rectangle ++
+      %     (\progressbar@currentslide\progressbar@chunk, 0.2cm);
+      \fi
+
+      % Draw the section marks, if requested
+      \ifprogressbarsection
+      \the\progressbar@toks
+      \fi
+
+      \progressbar@ctmp@i=\progressbar@totalslides\relax
+      \advance\progressbar@ctmp@i by -2
+      
+      \iflinks
+      {
+        \foreach\i in {0,...,\the\progressbar@ctmp@i} {
+          % This calculates the correct page ref for Skim & Adobe
+          \progressbar@ctmp@i=\i
+          \advance\progressbar@ctmp@i by 2        
+          % insert a hyperlink in an empty node
+          \node[inner sep=0pt,outer sep=0pt,anchor=south west] at 
+            ([xshift=(\i/(\progressbar@totalslides-1))*\progressbar@barlength*0.1cm]
+            \progressbar@leftbar, 0.11cm)
+            {
+              \hyperlink{page.\the\progressbar@ctmp@i}{%
+              \makebox[\progressbar@chunk]{\hfill
+                 \ifpips
+                 \raisebox{.05cm}{\color{fg!40!bg}$\cdot$}%
+                 \fi
+                 \rule{0pt}{.2cm}\hfill}}%
+            };
+       }
+     }
+     \fi
+   }
+   \fi
+     
+   \draw (\progressbar@leftbar, 0.11cm) 
+     [
+       draw=fg!30!bg,
+       inner sep=0pt,
+       outer sep=0pt,
+       rounded corners=0.1cm
+     ] 
+     rectangle ++(\progressbar@barlength*0.1cm, 0.2cm); 
+      
+  \end{tikzpicture}
+}
+
+
+\def\insertprogressbarframes{
+  % Write a macro to the auxiliary file to determine how many
+  % slides exist.
+  \immediate\write\@mainaux{\noexpand\progressbar@page{\the\c@page}}
+
+  % Set up some counters needed
+  \ifnum\insertframenumber=1\else
+    \progressbar@currentframe=\insertframenumber
+    \advance\progressbar@currentframe by -1
+    \progressbar@totalframes=\insertintermediateframenumber%\inserttotalframenumber
+    \advance\progressbar@totalframes by -1
+    \advance\progressbar@totalframes by \progressbar@adjustframetotals
+
+    \@ifundefined{progressbar@xref@\insertframenumber}{%
+      \immediate\write\@mainaux{%
+        \noexpand\progressbar@xref{\insertframenumber}{\the\c@page}}}{}
+
+    \@ifundefined{progressbar@totalslides}{%
+      % This happens if we are doing a first run and the .aux file
+      % doesn't have all of the data saved that we need. At this
+      % point, it's best to switch to drawing the progressbar in draft
+      % mode.
+      \global\let\insertprogressbar=\insertprogressbardraft
+      \insertprogressbardraft
+    }{%
+      \finishprogressbarframes
+    }
+  \fi
+}
+
+\def\finishprogressbarframes{
+  % First, calculate the right chunk size to use
+  \pgfmathsetlength{\progressbar@chunk}{%
+    (1/(\progressbar@totalframes)*(\progressbar@barlength))*.1cm
+  }
+
+  \begin{tikzpicture}
+    \shade[top color=bg, bottom color=bg!80!fg] 
+        (0, 0) rectangle  (\paperwidth, 0.525cm);
+    \shade[left color=bg,right color=bg!70!fg] 
+        (.5\paperwidth, 0.2cm) rectangle (\paperwidth, 0.22cm);
+      
+    % Draw the N/M numbers on the right
+    {
+      \draw (\progressbar@framenumberrectangle, 0.21cm) 
+        node [anchor=mid west, draw=bg!70!fg, fill=bg] 
+        {
+          \color{structure.fg!70!bg}%
+          \the\progressbar@currentframe~/~\the\progressbar@totalframes
+        };
+    }
+
+    \fill[fill=bg, rounded corners=0.1cm] 
+      (\progressbar@leftbar, 0.12cm) 
+      rectangle 
+      (\progressbar@titlerectangle, 0.3cm);
+      
+    \ifnum\insertframenumber=1\else {
+      % This draws the main progress bar
+      \shade[left color=progressbarleft,
+          right color=progressbarright, 
+          rounded corners=0.1cm] 
+          (\progressbar@leftbar, 0.11cm) rectangle ++
+          (\progressbar@currentframe\progressbar@chunk, 0.2cm);
+      % \shade[left color=progressbar primary.fg!10!bg,
+      %     right color=progressbar primary.fg!20!bg, 
+      %     rounded corners=0.1cm] 
+      %     (\progressbar@leftbar, 0.11cm) rectangle ++
+      %     (\progressbar@currentframe\progressbar@chunk, 0.2cm);
+      
+      % Draw the section marks, if requested
+      \ifprogressbarsection
+      \the\progressbar@toks
+      \fi
+
+      \progressbar@ctmp@i=\progressbar@totalframes
+      \advance\progressbar@ctmp@i by -1
+
+      \iflinks
+      {
+        \foreach\i in {0,...,\the\progressbar@ctmp@i} {
+          % This calculates the correct page ref for Skim & Adobe
+          \progressbar@ctmp@i=\i
+          \advance\progressbar@ctmp@i by 2        
+          % insert a hyperlink in an empty node
+          \node[inner sep=0pt,outer sep=0pt,anchor=south west] at 
+          ([xshift=(\i/(\progressbar@totalframes))*\progressbar@barlength*0.1cm]
+          \progressbar@leftbar, 0.11cm)
+          {
+            \edef\j{\csname progressbar@frameref@\the\progressbar@ctmp@i\endcsname}%
+            \hyperlink{page.\j}{%
+            \makebox[\progressbar@chunk]{\hfill
+               \ifpips
+               \raisebox{.05cm}{\color{fg!40!bg}$\cdot$}%
+               \fi
+               \rule{0pt}{.2cm}\hfill}}%
+          };
+       }
+     }
+     \fi
+   }
+   \fi
+     
+   \draw (\progressbar@leftbar, 0.11cm) 
+     [
+       draw=fg!30!bg,
+       inner sep=0pt,
+       outer sep=0pt,
+       rounded corners=0.1cm
+     ] 
+     rectangle ++(\progressbar@barlength*0.1cm, 0.2cm); 
+      
+  \end{tikzpicture}
+}
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Definition of the customized templates...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\mode<presentation>
+
+\newlength\progressbar@sectionboxwidth
+\newlength\progressbar@sectionboxheight
+\newbox\progressbar@sectionbox
+\newbox\progressbar@sectionboxbox
+
+% \usesectionheadtemplate
+%   {\hfill
+%     \setbox\progressbar@sectionbox=\hbox{\insertsectionhead}%
+%     \progressbar@sectionboxwidth=\wd\progressbar@sectionbox
+%     \advance\progressbar@sectionboxwidth by 4pt
+%     \setbox\progressbar@sectionbox=\hbox{\pgfinterruptpicture t \endpgfinterruptpicture}%
+%     \progressbar@sectionboxheight=\ht\progressbar@sectionbox
+%     \advance\progressbar@sectionboxheight by 4pt
+%     \begin{tikzpicture}
+%       \useasboundingbox (-0.5\progressbar@sectionboxwidth, 0pt) rectangle (0.5\progressbar@sectionboxwidth, \progressbar@sectionboxheight);
+%       \draw[anchor=base] (0pt, 2pt) node {\color{structure.fg!80!bg} \insertsectionhead};
+%       \draw[rounded corners=3pt, draw=structure.fg!80!bg] (-0.5\progressbar@sectionboxwidth, 0pt) rectangle (0.5\progressbar@sectionboxwidth, \progressbar@sectionboxheight);
+%     \end{tikzpicture}
+%   }
+%   {\hfill
+%     \setbox\progressbar@sectionbox=\hbox{\pgfinterruptpicture\insertsectionhead\endpgfinterruptpicture}%
+%     \progressbar@sectionboxwidth=\wd\progressbar@sectionbox
+%     \advance\progressbar@sectionboxwidth by 4pt
+%     \setbox\progressbar@sectionboxbox=\hbox{\pgfinterruptpicture t \endpgfinterruptpicture}%
+%     \progressbar@sectionboxheight=\ht\progressbar@sectionboxbox
+%     \advance\progressbar@sectionboxheight by 4pt
+%     \begin{tikzpicture}
+%       \useasboundingbox (-0.5\progressbar@sectionboxwidth, 0pt) rectangle (0.5\progressbar@sectionboxwidth, \progressbar@sectionboxheight);
+%       \draw[anchor=base] (0pt, 2pt) node {\color{structure.fg!50!bg} \insertsectionhead};
+%     \end{tikzpicture}
+%   }
+
+\usesectionheadtemplate
+  {\hfill
+    \setbox\progressbar@sectionbox=\hbox{\insertsectionhead}%
+    \progressbar@sectionboxwidth=\wd\progressbar@sectionbox
+    \advance\progressbar@sectionboxwidth by 4pt
+    \setbox\progressbar@sectionbox=\hbox{\pgfinterruptpicture t \endpgfinterruptpicture}%
+    \progressbar@sectionboxheight=\ht\progressbar@sectionbox
+    \advance\progressbar@sectionboxheight by 4pt
+    \begin{tikzpicture}
+      \useasboundingbox (-0.5\progressbar@sectionboxwidth, 0pt) rectangle (0.5\progressbar@sectionboxwidth, \progressbar@sectionboxheight);
+      \draw[anchor=base] (0pt, 2pt) node {%
+        \mode<presentation>{\color{white}}%
+        \mode<handout>{\color{progressbar headline.fg}}%
+      	\textbf{\insertsectionhead}};
+    \end{tikzpicture}
+  }
+  {\hfill
+    \setbox\progressbar@sectionbox=\hbox{\pgfinterruptpicture\insertsectionhead\endpgfinterruptpicture}%
+    \progressbar@sectionboxwidth=\wd\progressbar@sectionbox
+    \advance\progressbar@sectionboxwidth by 4pt
+    \setbox\progressbar@sectionboxbox=\hbox{\pgfinterruptpicture t \endpgfinterruptpicture}%
+    \progressbar@sectionboxheight=\ht\progressbar@sectionboxbox
+    \advance\progressbar@sectionboxheight by 4pt
+    \begin{tikzpicture}
+      \useasboundingbox (-0.5\progressbar@sectionboxwidth, 0pt) rectangle (0.5\progressbar@sectionboxwidth, \progressbar@sectionboxheight);
+      \draw[anchor=base] (0pt, 2pt) node {%
+        \color{white!50!gray}%
+        \mode<handout>{\color{progressbar headline.fg!40!white}}\insertsectionhead};
+    \end{tikzpicture}
+  }
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Headline...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\setbeamercolor{progressbar headline}{parent=section in head/foot}
+
+\defbeamertemplate*{headline}{progressbarjma theme}
+{%
+  \leavevmode%
+  \begin{beamercolorbox}[wd=\paperwidth,ht=4ex,dp=1.125ex]{progressbar headline}%
+      % section in head/foot}
+    \insertsectionnavigationhorizontal{\paperwidth}{}{}%\hskip0pt plus1filll}{}%
+  \end{beamercolorbox}%
+  \mode<handout>{{\hskip-\paperwidth\color{gray}\rule[-1pt]{\paperwidth}{0.5pt}}}%
+}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Footline...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\defbeamertemplate*{footline}{progressbar theme}{
+  \begin{beamercolorbox}[wd=\paperwidth,ht=0.45cm,dp=0ex]{progressbar in head/foot}%
+    \insertprogressbar
+  \end{beamercolorbox}%
+}
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Title page...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%\institute{(void)}
+
+% \defbeamertemplate*{title page}{progressbar theme}{
+%   \pgfdeclarehorizontalshading{separationtitlepagelineshading}{0.5pt}{color(0cm)=(bg); color(0.5\textwidth)=(structure.fg); color(\textwidth)=(bg)}
+  
+%   \makeatletter
+%   \begin{center}
+%     \textbf{\textcolor{structure.fg}\large\inserttitle}
+    
+%     \pgfuseshading{separationtitlepagelineshading}
+%     \vskip\baselineskip
+%     \footnotesize\insertauthor\\[\baselineskip]
+%     \ifx\insertinstitute\@empty \else\tiny\insertinstitute\\[\baselineskip]\fi
+%     \insertlogo
+%     \vskip\baselineskip
+%     \pgfuseshading{separationtitlepagelineshading}
+%     \vfill
+%     \footnotesize    
+%     \insertdate
+%   \end{center}
+%   \makeatother
+% }
+% \setbeamertemplate{title page}[mytitlepage]
+
+\defbeamertemplate*{title page}{progressbarjma theme}{
+  \pgfdeclarehorizontalshading{separationtitlepagelineshading}{0.5pt}{
+  	color(0cm)=(blue!20!white); 
+  	color(0.5\textwidth)=(black!75!blue); 
+  	color(\textwidth)=(blue!20!white)}
+
+  \iftitleswatch
+  \pgfdeclarehorizontalshading{myshadingA}{0.25cm}{
+    color(0cm)=(blue!65!black);
+    color(2cm)=(blue!65!black);
+    color(\paperwidth)=(white)}
+  \vspace*{-0.90cm}%
+  \hspace*{-1cm}\pgfuseshading{myshadingA}
+  \fi\rule{0pt}{0.25cm}
+
+  \makeatletter
+  \vfill
+  
+  \begin{center}
+  	\pgfuseshading{separationtitlepagelineshading}
+	\vskip.75\baselineskip
+    \textbf{\color{blue!55!black}\large \inserttitle}
+    \pgfuseshading{separationtitlepagelineshading}
+    
+    \vskip\baselineskip
+    \normalsize\insertauthor\\[.5\baselineskip]
+    \ifx\insertinstitute\@empty \else
+    	\scriptsize\insertinstitute\\[\baselineskip]
+    \fi
+    \insertlogo
+    \vskip\baselineskip
+    \vskip 0pt %plus.125fill
+    \footnotesize    
+    \insertdate
+  \end{center}
+  
+  \makeatother
+}
+
+%%% Stuff copied in from "shadow"
+
+
+\setbeamercolor{frametitle}{parent=subsection in head/foot}
+\setbeamercolor{frametitle right}{parent=section in head/foot}
+
+
+\pgfdeclarehorizontalshading[frametitle.bg,frametitle right.bg]{beamer@frametitleshade}{\paperheight}{%
+  color(0pt)=(frametitle.bg);
+  color(\paperwidth)=(frametitle right.bg)}
+
+\AtBeginDocument{
+  \pgfdeclareverticalshading{beamer@topshade}{\paperwidth}{%
+    color(0pt)=(bg);
+    color(4pt)=(black!50!bg)}
+}
+
+\defbeamertemplate*{frametitle}{progressbarjma theme}
+{%
+  \nointerlineskip%
+  \vskip-2pt%
+  \hbox{\leavevmode
+    \advance\beamer@leftmargin by -12bp%
+    \advance\beamer@rightmargin by -12bp%
+    \beamer@tempdim=\textwidth%
+    \advance\beamer@tempdim by \beamer@leftmargin%
+    \advance\beamer@tempdim by \beamer@rightmargin%
+    \hskip-\Gm@lmargin\hbox{%
+      \setbox\beamer@tempbox=\hbox{\begin{minipage}[b]{\paperwidth}%
+          \vbox{}\vskip-.75ex%
+          \leftskip0.16cm%
+          \rightskip0.3cm plus1fil\leavevmode
+          \insertframetitle%
+          \ifx\insertframesubtitle\@empty%
+            \strut\par%
+          \else
+            \par{\usebeamerfont*{framesubtitle}{\usebeamercolor[fg]{framesubtitle}\insertframesubtitle}\strut\par}%
+          \fi%
+          \nointerlineskip
+          \vbox{}%
+          \end{minipage}}%
+      \beamer@tempdim=\ht\beamer@tempbox%
+      \advance\beamer@tempdim by 2pt%
+      \begin{pgfpicture}{0pt}{0pt}{\paperwidth}{\beamer@tempdim}
+        \usebeamercolor{frametitle right}
+        \pgfpathrectangle{\pgfpointorigin}{\pgfpoint{\paperwidth}{\beamer@tempdim}}
+        \pgfusepath{clip}
+        \pgftext[left,base]{\pgfuseshading{beamer@frametitleshade}}
+      \end{pgfpicture}
+      \hskip-\paperwidth%
+      \box\beamer@tempbox%
+    }%
+    \hskip-\Gm@rmargin%
+  }%
+  \nointerlineskip
+  \mode<trans|beamer>{%
+    \vskip-0.2pt
+    \hbox to\textwidth{\hskip-\Gm@lmargin\pgfuseshading{beamer@topshade}\hskip-\Gm@rmargin}
+    \vskip-2pt
+  }%
+  \mode<handout>{%
+  \hbox to\textwidth{\hskip-\Gm@lmargin%
+  \color{gray}\rule{\paperwidth}{0.5pt}\hskip-\Gm@rmargin}
+  }%
+}
+
+% Some definitions which enable making a index with
+% clickable thumbnails...
+
+\newcounter{thumbnail}
+\setcounter{thumbnail}{1}
+\newcounter{thumbnail@lastframe}
+
+\def\thumbnails#1#2{%
+  \def\thumbnail@sourcefile{#1}%
+  \setcounter{thumbnail@lastframe}{#2}%
+  \addtocounter{thumbnail@lastframe}{1}%
+  \make@thumbnails  
+}
+
+\def\linktoframe#1#2{%
+  \begingroup
+  \edef\link{\csname progressbar@frameref@#1\endcsname}
+  \hyperlink{page.\link}{#2}%
+  \endgroup} 
+
+\def\thumbnail@slide{%
+  \ifnum\value{thumbnail}<\value{thumbnail@lastframe}
+    \begingroup
+    \setlength{\fboxsep}{0pt}% 
+    \linktoframe{\the\c@thumbnail}{%
+      \fbox{%
+      \includegraphics[page=\value{thumbnail},
+        width=.3\textwidth]{\thumbnail@sourcefile}}%
+    }%
+    \endgroup
+    \addtocounter{thumbnail}{1}%
+  \else
+    \makebox[.3\textwidth]{\strut\hfill}%
+  \fi}
+
+\def\first@thumbnail@sheet{%
+  \begin{frame}[plain,label=index]
+    \vspace{8pt}%
+    \begin{center}%
+      \begin{tabular}{@{}c@{\hspace{3pt}}c@{\hspace{3pt}}c@{}}
+        \thumbnail@slide & \thumbnail@slide & \thumbnail@slide\\[3pt]
+        \thumbnail@slide & \thumbnail@slide & \thumbnail@slide\\[3pt]
+        \thumbnail@slide & \thumbnail@slide & \thumbnail@slide
+      \end{tabular}
+    \end{center}
+  \end{frame}}
+
+\def\other@thumbnail@sheets{%
+    \begin{frame}[plain]
+    \vspace{8pt}%
+    \begin{center}%
+      \begin{tabular}{@{}c@{\hspace{3pt}}c@{\hspace{3pt}}c@{}}
+        \thumbnail@slide & \thumbnail@slide & \thumbnail@slide\\[3pt]
+        \thumbnail@slide & \thumbnail@slide & \thumbnail@slide\\[3pt]
+        \thumbnail@slide & \thumbnail@slide & \thumbnail@slide
+      \end{tabular}
+    \end{center}
+  \end{frame}}
+
+\def\make@thumbnails{%
+  \ifnum\value{thumbnail}=1
+    \expandafter\first@thumbnail@sheet
+  \else
+    \expandafter\other@thumbnail@sheets
+  \fi
+  \ifnum\value{thumbnail}<\value{thumbnail@lastframe}
+  \expandafter\make@thumbnails\fi  
+}
+
+\def\insertindexnavigationsymbol{%
+  \raisebox{0.3pt}{\hyperlink{index}{%
+      \begin{tikzpicture}[scale=.09]
+        \draw (0,0) rectangle (1,1);
+        \draw (1.3,0) rectangle (2.3,1);
+        \draw (0,1.3) rectangle (1,2.3);
+        \draw (1.3,1.3) rectangle (2.3,2.3);
+      \end{tikzpicture}}}}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%
+% Background...
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\usebeamercolor{progressbar primary}
+
+\mode
+<all>
+
+\makeatother
